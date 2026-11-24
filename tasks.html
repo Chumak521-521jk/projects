@@ -1,118 +1,206 @@
 <!DOCTYPE html>
 <html lang="ru">
-<head>
-<meta charset="UTF-8">
-<title>Список задач</title>
-<style>
-body { font-family: sans-serif; max-width: 600px; margin: 20px auto; }
-li { padding: 8px; border: 1px solid #ccc; margin: 4px 0; cursor: pointer; }
-li[aria-selected="true"] { background: #cce4ff; font-weight: bold; }
-dialog { border: 1px solid #888; padding: 20px; }
-button { margin: 4px; padding: 6px 12px; }
-</style>
-</head>
-<body>
-<h1>Мои задачи</h1>
+  <head>
+    <meta charset="utf-8">
+    <title>Доска задач</title>
+    <style>
+      body { font-family: Arial, sans-serif; padding: 20px; }
+      button { padding: 8px 12px; cursor: pointer; margin-right: 8px; }
+      #board { display: flex; gap: 16px; margin-top: 16px; flex-wrap: wrap; }
+      .column { flex: 1; min-width: 220px; border: 1px solid #ccc; border-radius: 6px; padding: 8px; }
+      .column h2 { font-size: 1.1em; margin-top: 0; }
+      .task-list { min-height: 60px; padding: 0; margin: 0; }
+      .task-item { border: 1px solid #bbb; padding: 8px; margin: 6px 0; border-radius: 4px; cursor: pointer; }
+      .task-item.selected { background-color: #eef; border-color: #007bff; font-weight: bold; }
+      .task-status { display: block; font-size: 0.85em; color: #555; }
+      dialog { padding: 16px; min-width: 300px; }
+      input[type="text"] { width: 100%; padding: 6px; box-sizing: border-box; }
+    </style>
+  </head>
+  <body>
+    <h1>Доска задач</h1>
 
-<button id="btnAdd" aria-label="Добавить задачу">Добавить задачу</button>
-<button id="btnDelete" aria-label="Удалить выбранную задачу" disabled>Удалить выбранную задачу</button>
+    <div>
+      <button id="add-btn" aria-label="Добавить задачу">Добавить задачу</button>
+      <button id="delete-btn" disabled aria-label="Удалить выбранную задачу">Удалить выбранную задачу</button>
+      <button id="move-left-btn" disabled aria-label="Переместить выбранную задачу влево">&larr; Переместить влево</button>
+      <button id="move-right-btn" disabled aria-label="Переместить выбранную задачу вправо">Переместить вправо &rarr;</button>
+    </div>
 
-<ul id="taskList" role="listbox" aria-label="Список задач" aria-activedescendant=""></ul>
-<p id="status" role="status" aria-live="polite"></p>
+    <p id="status-msg" role="status" aria-live="polite"></p>
 
-<dialog id="dlg" aria-labelledby="dlgTitle">
-  <h2 id="dlgTitle">Новая задача</h2>
-  <p><label for="taskInput">Текст задачи:</label></p>
-  <p><input id="taskInput" type="text" size="40"></p>
-  <button id="btnSave">Добавить</button>
-  <button id="btnCancel">Отмена</button>
-</dialog>
+    <div id="board">
+      <section class="column">
+        <h2 id="col-h-0">К работе</h2>
+        <div class="task-list" id="col-0" role="listbox" aria-labelledby="col-h-0"></div>
+      </section>
+      <section class="column">
+        <h2 id="col-h-1">К выполнению</h2>
+        <div class="task-list" id="col-1" role="listbox" aria-labelledby="col-h-1"></div>
+      </section>
+      <section class="column">
+        <h2 id="col-h-2">Выполнено</h2>
+        <div class="task-list" id="col-2" role="listbox" aria-labelledby="col-h-2"></div>
+      </section>
+    </div>
 
-<script>
-var tasks = [];
-var selected = -1;
+    <dialog id="add-dialog" aria-modal="true" aria-labelledby="dialog-title">
+      <h2 id="dialog-title">Новая задача</h2>
+      <label for="task-input">Текст задачи:</label>
+      <input type="text" id="task-input" autocomplete="off">
+      <br><br>
+      <button id="save-task-btn">Добавить</button>
+      <button id="cancel-task-btn">Отмена</button>
+    </dialog>
 
-var list = document.getElementById('taskList');
-var dlg = document.getElementById('dlg');
-var input = document.getElementById('taskInput');
-var btnDelete = document.getElementById('btnDelete');
-var status = document.getElementById('status');
+    <script>
+      const columnNames = ['К работе', 'К выполнению', 'Выполнено'];
+      const columns = [
+        document.getElementById('col-0'),
+        document.getElementById('col-1'),
+        document.getElementById('col-2')
+      ];
 
-function render() {
-  list.innerHTML = '';
-  for (var i = 0; i < tasks.length; i++) {
-    var li = document.createElement('li');
-    li.id = 'task-' + i;
-    li.setAttribute('role', 'option');
-    li.tabIndex = (i === selected) ? 0 : -1;
-    if (i === selected) {
-      li.setAttribute('aria-selected', 'true');
-      list.setAttribute('aria-activedescendant', 'task-' + i);
-    } else {
-      li.setAttribute('aria-selected', 'false');
-    }
-    li.textContent = tasks[i];
-    li.addEventListener('click', function() {
-      selected = parseInt(this.id.replace('task-', ''), 10);
-      render();
-    });
-    list.appendChild(li);
-  }
-  btnDelete.disabled = (selected < 0);
-}
+      const dialog = document.getElementById('add-dialog');
+      const addBtn = document.getElementById('add-btn');
+      const taskInput = document.getElementById('task-input');
+      const saveBtn = document.getElementById('save-task-btn');
+      const cancelBtn = document.getElementById('cancel-task-btn');
+      const deleteBtn = document.getElementById('delete-btn');
+      const moveLeftBtn = document.getElementById('move-left-btn');
+      const moveRightBtn = document.getElementById('move-right-btn');
+      const statusMsg = document.getElementById('status-msg');
 
-function say(msg) {
-  status.textContent = msg;
-}
+      let selectedTaskEl = null;
 
-document.getElementById('btnAdd').addEventListener('click', function() {
-  input.value = '';
-  dlg.showModal();
-  input.focus();
-});
+      function showStatus(msg) {
+        statusMsg.textContent = msg;
+      }
 
-document.getElementById('btnSave').addEventListener('click', function() {
-  var text = input.value.trim();
-  if (text === '') {
-    input.focus();
-    return;
-  }
-  tasks.push(text);
-  selected = tasks.length - 1;
-  dlg.close();
-  render();
-  list.focus();
-  say('Задача добавлена: ' + text);
-});
+      function columnIndex(el) {
+        return columns.indexOf(el.parentNode);
+      }
 
-document.getElementById('btnCancel').addEventListener('click', function() {
-  dlg.close();
-  document.getElementById('btnAdd').focus();
-});
+      function updateButtons() {
+        const hasTask = selectedTaskEl !== null;
+        deleteBtn.disabled = !hasTask;
+        moveLeftBtn.disabled = !hasTask || columnIndex(selectedTaskEl) === 0;
+        moveRightBtn.disabled = !hasTask || columnIndex(selectedTaskEl) === 2;
+      }
 
-document.getElementById('btnDelete').addEventListener('click', function() {
-  if (selected < 0) return;
-  var removed = tasks.splice(selected, 1)[0];
-  if (selected >= tasks.length) selected = tasks.length - 1;
-  render();
-  say('Задача удалена: ' + removed);
-});
+      function selectTask(el) {
+        if (selectedTaskEl) {
+          selectedTaskEl.classList.remove('selected');
+          selectedTaskEl.setAttribute('aria-selected', 'false');
+        }
+        selectedTaskEl = el;
+        el.classList.add('selected');
+        el.setAttribute('aria-selected', 'true');
+        updateButtons();
+        showStatus('Выбрана задача: ' + el.dataset.text +
+          ', колонка: ' + columnNames[columnIndex(el)] +
+          ', статус: ' + el.dataset.status);
+      }
 
-list.addEventListener('keydown', function(e) {
-  if (tasks.length === 0) return;
-  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-    e.preventDefault();
-    if (selected < 0) {
-      selected = 0;
-    } else if (e.key === 'ArrowDown' && selected < tasks.length - 1) {
-      selected = selected + 1;
-    } else if (e.key === 'ArrowUp' && selected > 0) {
-      selected = selected - 1;
-    }
-    render();
-    document.getElementById('task-' + selected).focus();
-  }
-});
-</script>
-</body>
+      function createTask(text) {
+        const el = document.createElement('div');
+        el.className = 'task-item';
+        el.role = 'option';
+        el.tabIndex = 0;
+        el.dataset.text = text;
+        el.dataset.status = columnNames[0];
+        el.setAttribute('aria-selected', 'false');
+
+        const title = document.createElement('span');
+        title.textContent = text;
+        const status = document.createElement('span');
+        status.className = 'task-status';
+        status.textContent = 'Статус: ' + columnNames[0];
+
+        el.appendChild(title);
+        el.appendChild(status);
+
+        el.addEventListener('click', () => selectTask(el));
+        el.addEventListener('keydown', (e) => {
+          const items = Array.from(el.parentNode.children);
+          const pos = items.indexOf(el);
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            selectTask(el);
+          } else if (e.key === 'ArrowDown' && pos < items.length - 1) {
+            e.preventDefault();
+            selectTask(items[pos + 1]);
+            items[pos + 1].focus();
+          } else if (e.key === 'ArrowUp' && pos > 0) {
+            e.preventDefault();
+            selectTask(items[pos - 1]);
+            items[pos - 1].focus();
+          } else if (e.ctrlKey && e.key === 'ArrowRight') {
+            e.preventDefault();
+            moveTask(1);
+          } else if (e.ctrlKey && e.key === 'ArrowLeft') {
+            e.preventDefault();
+            moveTask(-1);
+          }
+        });
+
+        return el;
+      }
+
+      function moveTask(dir) {
+        if (!selectedTaskEl) return;
+        const from = columnIndex(selectedTaskEl);
+        const to = from + dir;
+        if (to < 0 || to > 2) {
+          showStatus('Задача уже находится в крайней колонке.');
+          return;
+        }
+        columns[to].appendChild(selectedTaskEl);
+        selectedTaskEl.dataset.status = columnNames[to];
+        selectedTaskEl.querySelector('.task-status').textContent =
+          'Статус: ' + columnNames[to];
+        updateButtons();
+        showStatus('Задача ' + selectedTaskEl.dataset.text +
+          ' перемещена в колонку: ' + columnNames[to] +
+          '. Статус: ' + selectedTaskEl.dataset.status);
+      }
+
+      addBtn.addEventListener('click', () => {
+        taskInput.value = '';
+        dialog.showModal();
+        taskInput.focus();
+      });
+
+      cancelBtn.addEventListener('click', () => dialog.close());
+
+      saveBtn.addEventListener('click', () => {
+        const text = taskInput.value.trim();
+        if (!text) {
+          showStatus('Введите текст задачи.');
+          return;
+        }
+        const el = createTask(text);
+        columns[0].appendChild(el);
+        dialog.close();
+        showStatus('Задача добавлена в колонку: ' + columnNames[0] +
+          '. Статус: ' + columnNames[0]);
+      });
+
+      taskInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') saveBtn.click();
+      });
+
+      deleteBtn.addEventListener('click', () => {
+        if (!selectedTaskEl) return;
+        const msg = 'Задача удалена: ' + selectedTaskEl.dataset.text;
+        selectedTaskEl.remove();
+        selectedTaskEl = null;
+        updateButtons();
+        showStatus(msg);
+      });
+
+      moveLeftBtn.addEventListener('click', () => moveTask(-1));
+      moveRightBtn.addEventListener('click', () => moveTask(1));
+    </script>
+  </body>
 </html>
