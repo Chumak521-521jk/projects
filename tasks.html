@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>Список задач</title>
+<style>
+body { font-family: sans-serif; max-width: 600px; margin: 20px auto; }
+li { padding: 8px; border: 1px solid #ccc; margin: 4px 0; cursor: pointer; }
+li[aria-selected="true"] { background: #cce4ff; font-weight: bold; }
+dialog { border: 1px solid #888; padding: 20px; }
+button { margin: 4px; padding: 6px 12px; }
+</style>
+</head>
+<body>
+<h1>Мои задачи</h1>
+
+<button id="btnAdd" aria-label="Добавить задачу">Добавить задачу</button>
+<button id="btnDelete" aria-label="Удалить выбранную задачу" disabled>Удалить выбранную задачу</button>
+
+<ul id="taskList" role="listbox" aria-label="Список задач" aria-activedescendant=""></ul>
+<p id="status" role="status" aria-live="polite"></p>
+
+<dialog id="dlg" aria-labelledby="dlgTitle">
+  <h2 id="dlgTitle">Новая задача</h2>
+  <p><label for="taskInput">Текст задачи:</label></p>
+  <p><input id="taskInput" type="text" size="40"></p>
+  <button id="btnSave">Добавить</button>
+  <button id="btnCancel">Отмена</button>
+</dialog>
+
+<script>
+var tasks = [];
+var selected = -1;
+
+var list = document.getElementById('taskList');
+var dlg = document.getElementById('dlg');
+var input = document.getElementById('taskInput');
+var btnDelete = document.getElementById('btnDelete');
+var status = document.getElementById('status');
+
+function render() {
+  list.innerHTML = '';
+  for (var i = 0; i < tasks.length; i++) {
+    var li = document.createElement('li');
+    li.id = 'task-' + i;
+    li.setAttribute('role', 'option');
+    li.tabIndex = (i === selected) ? 0 : -1;
+    if (i === selected) {
+      li.setAttribute('aria-selected', 'true');
+      list.setAttribute('aria-activedescendant', 'task-' + i);
+    } else {
+      li.setAttribute('aria-selected', 'false');
+    }
+    li.textContent = tasks[i];
+    li.addEventListener('click', function() {
+      selected = parseInt(this.id.replace('task-', ''), 10);
+      render();
+    });
+    list.appendChild(li);
+  }
+  btnDelete.disabled = (selected < 0);
+}
+
+function say(msg) {
+  status.textContent = msg;
+}
+
+document.getElementById('btnAdd').addEventListener('click', function() {
+  input.value = '';
+  dlg.showModal();
+  input.focus();
+});
+
+document.getElementById('btnSave').addEventListener('click', function() {
+  var text = input.value.trim();
+  if (text === '') {
+    input.focus();
+    return;
+  }
+  tasks.push(text);
+  selected = tasks.length - 1;
+  dlg.close();
+  render();
+  list.focus();
+  say('Задача добавлена: ' + text);
+});
+
+document.getElementById('btnCancel').addEventListener('click', function() {
+  dlg.close();
+  document.getElementById('btnAdd').focus();
+});
+
+document.getElementById('btnDelete').addEventListener('click', function() {
+  if (selected < 0) return;
+  var removed = tasks.splice(selected, 1)[0];
+  if (selected >= tasks.length) selected = tasks.length - 1;
+  render();
+  say('Задача удалена: ' + removed);
+});
+
+list.addEventListener('keydown', function(e) {
+  if (tasks.length === 0) return;
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    e.preventDefault();
+    if (selected < 0) {
+      selected = 0;
+    } else if (e.key === 'ArrowDown' && selected < tasks.length - 1) {
+      selected = selected + 1;
+    } else if (e.key === 'ArrowUp' && selected > 0) {
+      selected = selected - 1;
+    }
+    render();
+    document.getElementById('task-' + selected).focus();
+  }
+});
+</script>
+</body>
+</html>
